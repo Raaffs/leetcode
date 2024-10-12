@@ -29,14 +29,6 @@ func maxTurbulenceSize(arr []int) int {
         if i == len(arr)-1 || !check(arr[i-1], arr[i], arr[i+1]) {
             maxLen = max(maxLen, i-start+1)
             start = i
-            if arr[i] == arr[i-1] {
-                maxLen = max(maxLen, i-start+1)
-				start = i
-            } else {
-				maxLen = max(maxLen, i-start)
-				start = i
-			}
-        } 
     }
 
     return maxLen
