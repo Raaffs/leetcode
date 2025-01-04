@@ -23,7 +23,6 @@ func levelOrder(root *TreeNode) [][]int {
                 nodes = append(nodes, currentNode.Right)
             }
         }
-
         result = append(result, row)
         row=[]int{}
     }
