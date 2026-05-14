@@ -61,11 +61,3 @@ func checkInclusion2(s1,s2 string)bool{
 	return false
 }
 
-func main() {
-	s1 := "ab"
-	s2 := "eidboaoo"
-
-	fmt.Println(checkInclusion(s1,s2))
-	fmt.Println(checkInclusion2(s1,s2))
-
-}

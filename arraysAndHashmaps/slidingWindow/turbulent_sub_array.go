@@ -11,26 +11,21 @@ func maxTurbulenceSize(arr []int) int {
 		return 2
 	}
 
-    allEqual := true
-    for i := 1; i < len(arr); i++ {
-        if arr[i] != arr[i-1] {
-            allEqual = false
-            break
-        }
-    }
-    if allEqual {
-        return 1
-    }
 
     maxLen := 1
 	start := 0
-
+    allEqual:=true
     for i := 1; i < len(arr); i++ {
+        if arr[i-1]!=arr[i]{
+            allEqual=false
+        }
         if i == len(arr)-1 || !check(arr[i-1], arr[i], arr[i+1]) {
             maxLen = max(maxLen, i-start+1)
             start = i
         }
-
+    }
+    if allEqual{
+        return 1
     }
     return maxLen
 }
