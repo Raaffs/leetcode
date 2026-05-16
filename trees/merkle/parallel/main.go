@@ -9,6 +9,7 @@ func main(){
 	leaves := []string{"a", "b", "c", "d", "e", "f", "g"}
 	root := buildMerkleTree(leaves)
 	fmt.Println("Merkle Root:", root)
+	fmt.Println("path for c",merkleProof(4,leaves))
 }
 
 func buildMerkleTree(leaves []string)string{
@@ -37,6 +38,35 @@ func buildMerkleTree(leaves []string)string{
 	}
 	wg.Wait()
 	return buildMerkleTree(nextLvl)
+}
+
+func merkleProof(index int, leaves []string)[]string{
+	var wg sync.WaitGroup
+	current:=make([]string,len(leaves))
+	copy(current,leaves)
+	currIdx:=index
+	path:=[]string{}
+	for len(current)>1{
+		if len(current)%2!=0{
+			current=append(current, current[len(current)-1])
+		}
+		currLen:=len(current)
+		nextLvl:=make([]string,currLen/2)
+		siblingIdx:= currIdx^1
+		path=append(path, current[siblingIdx])
+
+		for i:=0;i<currLen;i+=2{
+			wg.Add(1)
+			go func ()  {
+				defer wg.Done()
+				nextLvl[i/2]=hash(current[i],current[i+1])	
+			}()
+		}
+		currIdx=currIdx/2
+		wg.Wait()
+		current=nextLvl
+	}
+	return path
 }
 
 func hash(s1,s2 string)string{
