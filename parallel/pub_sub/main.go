@@ -3,38 +3,39 @@ package main
 import (
 	"fmt"
 	"log"
+	// "log"
 	"sync"
 )
 
-type Broker struct {
-	subChan   chan chan int
-	unsubChan chan chan int
-	pubChan   chan int
+type Broker struct{
+	subChan chan chan int 
+	pubChan chan int 
 }
 
-func NewBroker() *Broker {
-	b := &Broker{
-		subChan:   make(chan chan int),
-		unsubChan: make(chan chan int),
-		pubChan:   make(chan int),
+func NewBroker()*Broker{
+	b:=&Broker{
+		subChan: make(chan chan int),
+		pubChan: make(chan int),
 	}
 	go b.serve()
 	return b
 }
 
-func (b *Broker) serve() {
-	activeSubs := make(map[chan int]struct{})
-	persist := make(map[chan int][]int)
-	for {
-		select {
-		case ch := <-b.subChan:
-			activeSubs[ch] = struct{}{}
-		case data, ok := <-b.pubChan:
-			if !ok {
-				for sub := range activeSubs {
-					if backlog, exists := persist[sub]; exists {
-						for b := range backlog{
-							sub<-b
+type BackLog map[chan int][]int
+func(b *Broker)serve(){
+	activeSubs:=make(map[chan int]struct{})
+	backlog:=make(BackLog)
+
+	for{
+		select{
+		case sub:=<-b.subChan:
+			activeSubs[sub]=struct{}{}
+		case data,ok:=<-b.pubChan:
+			if !ok{
+				for sub:=range activeSubs{
+					if remaining,exist:=backlog[sub];exist{
+						for d:=range remaining{
+							sub<-d
 						}
 						close(sub)
 					}else{
@@ -43,86 +44,80 @@ func (b *Broker) serve() {
 				}
 				return 
 			}
-			for sub := range activeSubs {
-				b.broadCast(data, sub, persist)
+			for sub:=range activeSubs{
+				b.broadcast(data, sub, backlog)
 			}
-		case sub := <-b.unsubChan:
-			close(sub)
-			delete(activeSubs, sub)
-			delete(persist, sub)
 		}
 	}
 }
 
-func (b *Broker) Subscribe(channel chan int) { b.subChan <- channel }
-func (b *Broker) Publish(data int)           { b.pubChan <- data }
-
-func (b *Broker) broadCast(data int, sub chan int, persist map[chan int][]int) {
-	if len(persist[sub]) > 0 {
-		persist[sub] = append(persist[sub], data)
-		b.tryDrainingBacklog(sub, persist)
-		return
+func(b *Broker)broadcast(data int, sub chan int, backlog BackLog){
+	if len(backlog[sub])>0{
+		backlog[sub]=append(backlog[sub], data)
+		b.drainBacklog(sub,backlog)
+		return 
 	}
-
-	select {
-	case sub <- data:
+	select{
+	case sub<-data:
 	default:
-		persist[sub] = []int{data}
+		backlog[sub]=[]int{data}
 	}
 }
 
-func (b *Broker) tryDrainingBacklog(sub chan int, persist map[chan int][]int) {
-	queue := persist[sub]
-	for len(queue) > 0 {
-		select {
-		case sub <- queue[0]:
-			queue = queue[1:]
+func(b *Broker)drainBacklog(sub chan int, backlog BackLog){
+	queue:=backlog[sub]
+	for len(queue)>0{
+		select{
+		case sub<-queue[0]:
+			queue=queue[1:]
 		default:
-			persist[sub] = queue
+			backlog[sub]=queue
 			return
 		}
 	}
-	delete(persist, sub)
+	delete(backlog,sub)
 }
+func(b *Broker)Publish(data int) {b.pubChan<-data}
+func(b *Broker)Subscribe(sub chan int) {b.subChan<-sub}
 
-func main() {
-	broker := NewBroker()
-	var cWG sync.WaitGroup
-	var pWG sync.WaitGroup
-	for i := range 5 {
-		cWG.Add(1)
-		channel := make(chan int, 10)
+func main(){
+	broker:=NewBroker()
+
+	var cWg sync.WaitGroup
+	var pWg sync.WaitGroup
+
+	for i:=range 5{
+		cWg.Add(1)
+		msgs:=[]int{}
+		channel:=make(chan int,10)
 		broker.Subscribe(channel)
-		
-		go func(id int) { 
-			msgs:=[]int{}
-			defer cWG.Done()
-			for msg := range channel {
-				fmt.Printf("subscribe %d got msg %d\n", id, msg)
-				msgs=append(msgs, msg)
+		go func ()  {
+			defer cWg.Done()
+			for msg:=range channel{
+				msgs = append(msgs, msg)
+				fmt.Printf("consumer %d received msg %d\n",i+1,msg)
 			}
 			if len(msgs)!=30{
-				log.Fatalf("expected 30 got %d\n",len(msgs))
+				log.Fatalf("consumer %d received %d msgs, expected %d\n",(i+1),len(msgs),30)
 			}else{
-				fmt.Printf("subscribe %d received all messages successfully\n", id)
+				fmt.Printf("consumer %d received all msgs\n",(i+1))
 			}
-		}(i + 1) 
+		}()
 	}
 
-	for i := range 3 {
-		pWG.Add(1)
-		go func(pID int) {
-			defer pWG.Done()
-			for j := range 10 {
-				broker.Publish(pID*10 + j)
+	for i:=range 3{
+		pWg.Add(1)
+		go func ()  {
+			defer pWg.Done()
+			for j:=range 10{
+				broker.Publish((i+1)*10+j)
 			}
-		}(i + 1)
+		}()
 	}
 
-	go func() {
-		pWG.Wait()
+	go func ()  {
+		pWg.Wait()
 		close(broker.pubChan)
 	}()
-
-	cWG.Wait()
+	cWg.Wait()
 }
